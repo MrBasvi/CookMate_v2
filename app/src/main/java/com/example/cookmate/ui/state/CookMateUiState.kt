@@ -21,5 +21,6 @@ data class CookMateUiState(
     val mealDetailState: MealDetailUiState? = null,
     val selectedMealId: String? = null,
     val favorites: List<String> = emptyList(),
+    val favoriteMeals: List<Meal> = emptyList(),
     val allMeals: List<Meal> = emptyList()
 )

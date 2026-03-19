@@ -11,8 +11,6 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -32,7 +30,7 @@ fun CookMateNavHost(
     viewModel: CookMateViewModel = hiltViewModel()
 ) {
     val (selectedTab, setSelectedTab) = remember { mutableStateOf("search") }
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState = viewModel.uiState
 
     Column(modifier = Modifier.fillMaxSize()) {
         NavHost(
@@ -44,7 +42,6 @@ fun CookMateNavHost(
                 SearchScreen(
                     viewModel = viewModel,
                     onMealSelected = { mealId ->
-                        viewModel.getMealDetails(mealId)
                         navController.navigate("detail/$mealId")
                     }
                 )
@@ -52,9 +49,8 @@ fun CookMateNavHost(
 
             composable("favorites") {
                 FavoritesScreen(
-                    favoriteMeals = uiState.allMeals.filter { it.idMeal in uiState.favorites },
+                    favoriteMeals = uiState.favoriteMeals,
                     onMealSelected = { mealId ->
-                        viewModel.getMealDetails(mealId)
                         navController.navigate("detail/$mealId")
                     },
                     onToggleFavorite = { mealId ->

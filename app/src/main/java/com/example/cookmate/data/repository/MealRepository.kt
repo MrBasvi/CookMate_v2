@@ -1,15 +1,18 @@
 package com.example.cookmate.data.repository
 
+import com.example.cookmate.data.api.MealApiService
 import com.example.cookmate.data.api.RemoteMeal
-import com.example.cookmate.data.api.RetrofitInstance
 import com.example.cookmate.data.model.Ingredient
 import com.example.cookmate.data.model.Meal
+import javax.inject.Inject
 
-class MealRepository {
+class MealRepository @Inject constructor(
+    private val apiService: MealApiService
+) {
     
     suspend fun searchMealsByName(name: String): List<Meal> {
         return try {
-            val response = RetrofitInstance.apiService.searchMealsByName(name)
+            val response = apiService.searchMealsByName(name)
             response.meals?.map { it.toMeal() } ?: emptyList()
         } catch (e: Exception) {
             throw Exception("Ошибка поиска: ${e.localizedMessage}")
@@ -18,7 +21,7 @@ class MealRepository {
     
     suspend fun getMealDetails(mealId: String): Meal {
         return try {
-            val response = RetrofitInstance.apiService.getMealDetails(mealId)
+            val response = apiService.getMealDetails(mealId)
             val remoteMeal = response.meals?.firstOrNull()
                 ?: throw Exception("Рецепт не найден")
             remoteMeal.toMeal()

@@ -1,5 +1,8 @@
 package com.example.cookmate.ui.viewmodel
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.cookmate.data.model.Meal
@@ -9,9 +12,6 @@ import com.example.cookmate.ui.state.CookMateUiState
 import com.example.cookmate.ui.state.MealDetailUiState
 import com.example.cookmate.ui.state.MealUiState
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -21,8 +21,8 @@ class CookMateViewModel @Inject constructor(
     private val repository: MealRepository,
     private val favouriteService: FavouriteMealService
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow(CookMateUiState())
-    val uiState: StateFlow<CookMateUiState> = _uiState.asStateFlow()
+    var uiState by mutableStateOf(CookMateUiState())
+        private set
 
     init {
         observeFavourites()
@@ -31,44 +31,45 @@ class CookMateViewModel @Inject constructor(
     private fun observeFavourites() {
         viewModelScope.launch {
             favouriteService.getAllFavourites().collectLatest { favouriteMeals ->
-                val currentMeals = _uiState.value.allMeals
+                val currentMeals = uiState.allMeals
                 val mergedMeals = (currentMeals + favouriteMeals).distinctBy { it.idMeal }
                 val favouriteIds = favouriteMeals.map { it.idMeal }
 
-                _uiState.value = _uiState.value.copy(
+                uiState = uiState.copy(
                     favorites = favouriteIds,
-                    allMeals = mergedMeals
+                    allMeals = mergedMeals,
+                    favoriteMeals = favouriteMeals
                 )
             }
         }
     }
 
     fun updateSearchQuery(query: String) {
-        _uiState.value = _uiState.value.copy(searchQuery = query)
+        uiState = uiState.copy(searchQuery = query)
     }
 
     fun searchMeals(query: String) {
         if (query.isBlank()) {
-            _uiState.value = _uiState.value.copy(mealListState = MealUiState.Empty)
+            uiState = uiState.copy(mealListState = MealUiState.Empty)
             return
         }
 
-        _uiState.value = _uiState.value.copy(mealListState = MealUiState.Loading)
+        uiState = uiState.copy(mealListState = MealUiState.Loading)
 
         viewModelScope.launch {
             try {
                 val meals = repository.searchMealsByName(query)
                 
                 if (meals.isEmpty()) {
-                    _uiState.value = _uiState.value.copy(mealListState = MealUiState.Empty)
+                    uiState = uiState.copy(mealListState = MealUiState.Empty)
                 } else {
-                    _uiState.value = _uiState.value.copy(
+                    uiState = uiState.copy(
                         mealListState = MealUiState.Success(meals),
-                        allMeals = (_uiState.value.allMeals + meals).distinctBy { it.idMeal }
+                        allMeals = (uiState.allMeals + meals).distinctBy { it.idMeal }
                     )
                 }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
+                uiState = uiState.copy(
                     mealListState = MealUiState.Error("Ошибка поиска: ${e.localizedMessage ?: "Проверьте интернет"}")
                 )
             }
@@ -76,7 +77,7 @@ class CookMateViewModel @Inject constructor(
     }
 
     fun getMealDetails(mealId: String) {
-        _uiState.value = _uiState.value.copy(
+        uiState = uiState.copy(
             selectedMealId = mealId,
             mealDetailState = MealDetailUiState.Loading
         )
@@ -84,38 +85,37 @@ class CookMateViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 // Сначала проверяем, есть ли рецепт в избранном (там полные данные)
-                val favouriteMeal = _uiState.value.allMeals.firstOrNull {
+                val favouriteMeal = uiState.favoriteMeals.firstOrNull {
                     it.idMeal == mealId &&
-                    it.idMeal in _uiState.value.favorites &&
                     it.ingredients.isNotEmpty()
                 }
 
                 if (favouriteMeal != null) {
-                    _uiState.value = _uiState.value.copy(
+                    uiState = uiState.copy(
                         mealDetailState = MealDetailUiState.Success(favouriteMeal),
-                        allMeals = (_uiState.value.allMeals + favouriteMeal).distinctBy { it.idMeal }
+                        allMeals = (uiState.allMeals + favouriteMeal).distinctBy { it.idMeal }
                     )
                     return@launch
                 }
 
                 val meal = repository.getMealDetails(mealId)
-                if (mealId in _uiState.value.favorites) {
+                if (mealId in uiState.favorites) {
                     runCatching { favouriteService.addFavourite(meal) }
                 }
                 
-                _uiState.value = _uiState.value.copy(
+                uiState = uiState.copy(
                     mealDetailState = MealDetailUiState.Success(meal),
-                    allMeals = (_uiState.value.allMeals + meal).distinctBy { it.idMeal }
+                    allMeals = (uiState.allMeals + meal).distinctBy { it.idMeal }
                 )
             } catch (e: Exception) {
                 // Если не удалось загрузить через API, пробуем взять из allMeals без полных данных
-                val cachedMeal = _uiState.value.allMeals.firstOrNull { it.idMeal == mealId }
+                val cachedMeal = uiState.allMeals.firstOrNull { it.idMeal == mealId }
                 if (cachedMeal != null) {
-                    _uiState.value = _uiState.value.copy(
+                    uiState = uiState.copy(
                         mealDetailState = MealDetailUiState.Success(cachedMeal)
                     )
                 } else {
-                    _uiState.value = _uiState.value.copy(
+                    uiState = uiState.copy(
                         mealDetailState = MealDetailUiState.Error("Ошибка загрузки: ${e.localizedMessage ?: "Проверьте интернет"}")
                     )
                 }
@@ -128,7 +128,7 @@ class CookMateViewModel @Inject constructor(
     fun toggleFavorite(meal: Meal) {
         viewModelScope.launch {
             try {
-                val currentFavorites = _uiState.value.favorites.toMutableList()
+                val currentFavorites = uiState.favorites.toMutableList()
                 val isAlreadyFavorite = meal.idMeal in currentFavorites
 
                 if (isAlreadyFavorite) {
@@ -137,7 +137,7 @@ class CookMateViewModel @Inject constructor(
                     currentFavorites.add(meal.idMeal)
                 }
 
-                _uiState.value = _uiState.value.copy(favorites = currentFavorites)
+                uiState = uiState.copy(favorites = currentFavorites)
 
                 if (isAlreadyFavorite) {
                     favouriteService.removeFavourite(meal.idMeal)
@@ -155,13 +155,13 @@ class CookMateViewModel @Inject constructor(
                     favouriteService.addFavourite(mealWithDetails)
                 }
             } catch (e: Exception) {
-                val rollbackFavorites = _uiState.value.favorites.toMutableList()
+                val rollbackFavorites = uiState.favorites.toMutableList()
                 if (meal.idMeal in rollbackFavorites) {
                     rollbackFavorites.remove(meal.idMeal)
                 } else {
                     rollbackFavorites.add(meal.idMeal)
                 }
-                _uiState.value = _uiState.value.copy(favorites = rollbackFavorites)
+                uiState = uiState.copy(favorites = rollbackFavorites)
             }
         }
     }
@@ -169,8 +169,8 @@ class CookMateViewModel @Inject constructor(
     fun toggleFavorite(mealId: String) {
         viewModelScope.launch {
             try {
-                val mealFromList = _uiState.value.allMeals.firstOrNull { it.idMeal == mealId }
-                val mealFromDetail = (_uiState.value.mealDetailState as? MealDetailUiState.Success)?.meal
+                val mealFromList = uiState.allMeals.firstOrNull { it.idMeal == mealId }
+                val mealFromDetail = (uiState.mealDetailState as? MealDetailUiState.Success)?.meal
                 val meal = when {
                     mealFromList != null -> mealFromList
                     mealFromDetail?.idMeal == mealId -> mealFromDetail
@@ -182,19 +182,19 @@ class CookMateViewModel @Inject constructor(
                     return@launch
                 }
 
-                val currentFavorites = _uiState.value.favorites.toMutableList()
+                val currentFavorites = uiState.favorites.toMutableList()
                 if (mealId in currentFavorites) {
                     favouriteService.removeFavourite(mealId)
                     currentFavorites.remove(mealId)
                 }
-                _uiState.value = _uiState.value.copy(favorites = currentFavorites)
+                uiState = uiState.copy(favorites = currentFavorites)
             } catch (_: Exception) {
             }
         }
     }
 
     fun clearDetail() {
-        _uiState.value = _uiState.value.copy(
+        uiState = uiState.copy(
             selectedMealId = null,
             mealDetailState = null
         )
