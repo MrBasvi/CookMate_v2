@@ -24,34 +24,40 @@ import com.example.cookmate.ui.screens.FavoritesScreen
 import com.example.cookmate.ui.screens.SearchScreen
 import com.example.cookmate.ui.viewmodel.CookMateViewModel
 
+object CookMateRoutes {
+    const val SEARCH = "search"
+    const val FAVORITES = "favorites"
+    const val DETAIL = "detail"
+}
+
 @Composable
 fun CookMateNavHost(
     navController: NavHostController = rememberNavController(),
     viewModel: CookMateViewModel = hiltViewModel()
 ) {
-    val (selectedTab, setSelectedTab) = remember { mutableStateOf("search") }
+    val (selectedTab, setSelectedTab) = remember { mutableStateOf(CookMateRoutes.SEARCH) }
     val uiState = viewModel.uiState
 
     Column(modifier = Modifier.fillMaxSize()) {
         NavHost(
             navController = navController,
-            startDestination = "search",
+            startDestination = CookMateRoutes.SEARCH,
             modifier = Modifier.weight(1f)
         ) {
-            composable("search") {
+            composable(CookMateRoutes.SEARCH) {
                 SearchScreen(
                     viewModel = viewModel,
                     onMealSelected = { mealId ->
-                        navController.navigate("detail/$mealId")
+                        navController.navigate("${CookMateRoutes.DETAIL}/$mealId")
                     }
                 )
             }
 
-            composable("favorites") {
+            composable(CookMateRoutes.FAVORITES) {
                 FavoritesScreen(
                     favoriteMeals = uiState.favoriteMeals,
                     onMealSelected = { mealId ->
-                        navController.navigate("detail/$mealId")
+                        navController.navigate("${CookMateRoutes.DETAIL}/$mealId")
                     },
                     onToggleFavorite = { mealId ->
                         viewModel.toggleFavorite(mealId)
@@ -59,7 +65,7 @@ fun CookMateNavHost(
                 )
             }
 
-            composable("detail/{mealId}") { backStackEntry ->
+            composable("${CookMateRoutes.DETAIL}/{mealId}") { backStackEntry ->
                 val mealId = backStackEntry.arguments?.getString("mealId") ?: return@composable
 
                 LaunchedEffect(mealId) {
@@ -77,10 +83,10 @@ fun CookMateNavHost(
             NavigationBarItem(
                 icon = { Icon(Icons.Default.Search, contentDescription = "Поиск") },
                 label = { Text("Поиск") },
-                selected = selectedTab == "search",
+                selected = selectedTab == CookMateRoutes.SEARCH,
                 onClick = {
-                    setSelectedTab("search")
-                    navController.navigate("search") {
+                    setSelectedTab(CookMateRoutes.SEARCH)
+                    navController.navigate(CookMateRoutes.SEARCH) {
                         popUpTo(navController.graph.startDestinationId)
                         launchSingleTop = true
                     }
@@ -90,10 +96,10 @@ fun CookMateNavHost(
             NavigationBarItem(
                 icon = { Icon(Icons.Default.Favorite, contentDescription = "Избранное") },
                 label = { Text("Избранное") },
-                selected = selectedTab == "favorites",
+                selected = selectedTab == CookMateRoutes.FAVORITES,
                 onClick = {
-                    setSelectedTab("favorites")
-                    navController.navigate("favorites") {
+                    setSelectedTab(CookMateRoutes.FAVORITES)
+                    navController.navigate(CookMateRoutes.FAVORITES) {
                         popUpTo(navController.graph.startDestinationId)
                         launchSingleTop = true
                     }

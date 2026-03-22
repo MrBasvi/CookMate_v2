@@ -125,9 +125,21 @@ class CookMateViewModel @Inject constructor(
 
 
 
-    fun toggleFavorite(meal: Meal) {
+    fun toggleFavorite(mealId: String) {
         viewModelScope.launch {
             try {
+                val mealFromList = uiState.allMeals.firstOrNull { it.idMeal == mealId }
+                val mealFromDetail = (uiState.mealDetailState as? MealDetailUiState.Success)?.meal
+                val meal = when {
+                    mealFromList != null -> mealFromList
+                    mealFromDetail?.idMeal == mealId -> mealFromDetail
+                    else -> null
+                }
+
+                if (meal == null) {
+                    return@launch
+                }
+
                 val currentFavorites = uiState.favorites.toMutableList()
                 val isAlreadyFavorite = meal.idMeal in currentFavorites
 
@@ -156,41 +168,19 @@ class CookMateViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 val rollbackFavorites = uiState.favorites.toMutableList()
-                if (meal.idMeal in rollbackFavorites) {
-                    rollbackFavorites.remove(meal.idMeal)
+                if (mealId in rollbackFavorites) {
+                    rollbackFavorites.remove(mealId)
                 } else {
-                    rollbackFavorites.add(meal.idMeal)
+                    rollbackFavorites.add(mealId)
                 }
                 uiState = uiState.copy(favorites = rollbackFavorites)
             }
         }
     }
 
-    fun toggleFavorite(mealId: String) {
-        viewModelScope.launch {
-            try {
-                val mealFromList = uiState.allMeals.firstOrNull { it.idMeal == mealId }
-                val mealFromDetail = (uiState.mealDetailState as? MealDetailUiState.Success)?.meal
-                val meal = when {
-                    mealFromList != null -> mealFromList
-                    mealFromDetail?.idMeal == mealId -> mealFromDetail
-                    else -> null
-                }
-
-                if (meal != null) {
-                    toggleFavorite(meal)
-                    return@launch
-                }
-
-                val currentFavorites = uiState.favorites.toMutableList()
-                if (mealId in currentFavorites) {
-                    favouriteService.removeFavourite(mealId)
-                    currentFavorites.remove(mealId)
-                }
-                uiState = uiState.copy(favorites = currentFavorites)
-            } catch (_: Exception) {
-            }
-        }
+    // Overload для совместимости - делегирует в основной метод
+    fun toggleFavorite(meal: Meal) {
+        toggleFavorite(meal.idMeal)
     }
 
     fun clearDetail() {
