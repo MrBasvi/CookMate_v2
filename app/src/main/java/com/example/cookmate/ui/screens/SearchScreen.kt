@@ -161,7 +161,13 @@ fun SearchScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("Введите название для поиска")
+                    Text(
+                        text = if (uiState.searchQuery.isBlank()) {
+                            "Введите название для поиска"
+                        } else {
+                            "Ничего не найдено"
+                        }
+                    )
                 }
             }
         }

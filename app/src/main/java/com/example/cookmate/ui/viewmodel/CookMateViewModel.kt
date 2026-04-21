@@ -49,7 +49,8 @@ class CookMateViewModel @Inject constructor(
     }
 
     fun searchMeals(query: String) {
-        if (query.isBlank()) {
+        val trimmedQuery = query.trim()
+        if (trimmedQuery.isBlank()) {
             uiState = uiState.copy(mealListState = MealUiState.Empty)
             return
         }
@@ -58,7 +59,7 @@ class CookMateViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                val meals = repository.searchMealsByName(query)
+                val meals = repository.searchMealsByName(trimmedQuery)
                 
                 if (meals.isEmpty()) {
                     uiState = uiState.copy(mealListState = MealUiState.Empty)
@@ -84,13 +85,8 @@ class CookMateViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                // Сначала проверяем, есть ли рецепт в избранном (там полные данные)
-                val favouriteMeal = uiState.favoriteMeals.firstOrNull {
-                    it.idMeal == mealId &&
-                    it.ingredients.isNotEmpty()
-                }
-
-                if (favouriteMeal != null) {
+                val favouriteMeal = getStoredFavouriteMeal(mealId)
+                if (favouriteMeal?.ingredients?.isNotEmpty() == true) {
                     uiState = uiState.copy(
                         mealDetailState = MealDetailUiState.Success(favouriteMeal),
                         allMeals = (uiState.allMeals + favouriteMeal).distinctBy { it.idMeal }
@@ -99,20 +95,17 @@ class CookMateViewModel @Inject constructor(
                 }
 
                 val meal = repository.getMealDetails(mealId)
-                if (mealId in uiState.favorites) {
-                    runCatching { favouriteService.addFavourite(meal) }
-                }
-                
                 uiState = uiState.copy(
                     mealDetailState = MealDetailUiState.Success(meal),
                     allMeals = (uiState.allMeals + meal).distinctBy { it.idMeal }
                 )
             } catch (e: Exception) {
-                // Если не удалось загрузить через API, пробуем взять из allMeals без полных данных
-                val cachedMeal = uiState.allMeals.firstOrNull { it.idMeal == mealId }
+                val cachedMeal = getStoredFavouriteMeal(mealId)
+                    ?: uiState.allMeals.firstOrNull { it.idMeal == mealId }
                 if (cachedMeal != null) {
                     uiState = uiState.copy(
-                        mealDetailState = MealDetailUiState.Success(cachedMeal)
+                        mealDetailState = MealDetailUiState.Success(cachedMeal),
+                        allMeals = (uiState.allMeals + cachedMeal).distinctBy { it.idMeal }
                     )
                 } else {
                     uiState = uiState.copy(
@@ -123,64 +116,44 @@ class CookMateViewModel @Inject constructor(
         }
     }
 
+    private suspend fun getStoredFavouriteMeal(mealId: String): Meal? =
+        favouriteService.getFavourite(mealId)
+            ?: uiState.favoriteMeals.firstOrNull { it.idMeal == mealId }
+
 
 
     fun toggleFavorite(mealId: String) {
         viewModelScope.launch {
+            val mealFromList = uiState.allMeals.firstOrNull { it.idMeal == mealId }
+            val mealFromDetail = (uiState.mealDetailState as? MealDetailUiState.Success)?.meal
+            val meal = when {
+                mealFromList != null -> mealFromList
+                mealFromDetail?.idMeal == mealId -> mealFromDetail
+                else -> null
+            }
+
+            if (meal == null) {
+                return@launch
+            }
+
+            val isAlreadyFavorite = mealId in uiState.favorites
             try {
-                val mealFromList = uiState.allMeals.firstOrNull { it.idMeal == mealId }
-                val mealFromDetail = (uiState.mealDetailState as? MealDetailUiState.Success)?.meal
-                val meal = when {
-                    mealFromList != null -> mealFromList
-                    mealFromDetail?.idMeal == mealId -> mealFromDetail
-                    else -> null
-                }
-
-                if (meal == null) {
-                    return@launch
-                }
-
-                val currentFavorites = uiState.favorites.toMutableList()
-                val isAlreadyFavorite = meal.idMeal in currentFavorites
-
                 if (isAlreadyFavorite) {
-                    currentFavorites.remove(meal.idMeal)
-                } else {
-                    currentFavorites.add(meal.idMeal)
-                }
-
-                uiState = uiState.copy(favorites = currentFavorites)
-
-                if (isAlreadyFavorite) {
-                    favouriteService.removeFavourite(meal.idMeal)
+                    favouriteService.removeFavourite(mealId)
                 } else {
                     val mealWithDetails = if (meal.ingredients.isEmpty()) {
-                        try {
-                            repository.getMealDetails(meal.idMeal)
-                        } catch (_: Exception) {
-                            meal
-                        }
+                        repository.getMealDetails(mealId)
                     } else {
                         meal
                     }
-
                     favouriteService.addFavourite(mealWithDetails)
                 }
             } catch (e: Exception) {
-                val rollbackFavorites = uiState.favorites.toMutableList()
-                if (mealId in rollbackFavorites) {
-                    rollbackFavorites.remove(mealId)
-                } else {
-                    rollbackFavorites.add(mealId)
-                }
-                uiState = uiState.copy(favorites = rollbackFavorites)
+                uiState = uiState.copy(
+                    mealDetailState = MealDetailUiState.Error("Ошибка избранного: ${e.localizedMessage ?: "Попробуйте позже"}")
+                )
             }
         }
-    }
-
-    // Overload для совместимости - делегирует в основной метод
-    fun toggleFavorite(meal: Meal) {
-        toggleFavorite(meal.idMeal)
     }
 
     fun clearDetail() {

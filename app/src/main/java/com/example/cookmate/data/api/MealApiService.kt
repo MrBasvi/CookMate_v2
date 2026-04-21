@@ -9,12 +9,6 @@ interface MealApiService {
 
     @GET("lookup.php")
     suspend fun getMealDetails(@Query("i") id: String): MealDetailsResponse
-
-    @GET("categories.php")
-    suspend fun getCategories(): CategoriesResponse
-
-    @GET("filter.php")
-    suspend fun getMealsByCategory(@Query("c") category: String): MealResponse
 }
 
 data class MealResponse(
@@ -23,10 +17,6 @@ data class MealResponse(
 
 data class MealDetailsResponse(
     val meals: List<RemoteMeal>?
-)
-
-data class CategoriesResponse(
-    val categories: List<Category>
 )
 
 data class RemoteMeal(
@@ -81,9 +71,3 @@ data class RemoteMeal(
     val strMeasure20: String?
 )
 
-data class Category(
-    val idCategory: String,
-    val strCategory: String,
-    val strCategoryThumb: String,
-    val strCategoryDescription: String
-)

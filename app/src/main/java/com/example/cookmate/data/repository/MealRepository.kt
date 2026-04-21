@@ -11,23 +11,15 @@ class MealRepository @Inject constructor(
 ) {
     
     suspend fun searchMealsByName(name: String): List<Meal> {
-        return try {
-            val response = apiService.searchMealsByName(name)
-            response.meals?.map { it.toMeal() } ?: emptyList()
-        } catch (e: Exception) {
-            throw Exception("Ошибка поиска: ${e.localizedMessage}")
-        }
+        val response = apiService.searchMealsByName(name)
+        return response.meals?.map { it.toMeal() } ?: emptyList()
     }
     
     suspend fun getMealDetails(mealId: String): Meal {
-        return try {
-            val response = apiService.getMealDetails(mealId)
-            val remoteMeal = response.meals?.firstOrNull()
-                ?: throw Exception("Рецепт не найден")
-            remoteMeal.toMeal()
-        } catch (e: Exception) {
-            throw Exception("Ошибка загрузки: ${e.localizedMessage}")
-        }
+        val response = apiService.getMealDetails(mealId)
+        val remoteMeal = response.meals?.firstOrNull()
+            ?: throw Exception("Рецепт не найден")
+        return remoteMeal.toMeal()
     }
     
     private fun RemoteMeal.toMeal(): Meal {
